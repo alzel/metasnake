@@ -5,27 +5,6 @@ rule all:
         expand("mapping/bowtie2/{mapping_params}/{reference}/units/{unit}.bam", \
                 mapping_params = config["bowtie2_rules"]["mapping_params"], reference=config["input_files"]["references"], \
                 unit=config["bowtie2_rules"]["units"])
-        #expand("references/{reference}.fasta.gz", reference=config["input_files"]["references"]),
-        #expand("indices/{reference}.{index}.bt2l", index=range(1,5), reference=config["input_files"]["references"]),
-        #expand("indices/{reference}.rev.{index}.bt2l", index=range(1,3), reference=config["input_files"]["references"])
-        #dynamic("reference_genomes/{reference}/{id}.fasta.gz")
-
-# rule get_genomes:
-#     input:
-#         selected="input_files/coverage_selected.tsv"
-#     output:
-#         "tmp_dir/selected_content"
-#     shell:
-#         "cut -f1 {input.selected} | tail -n +2 > {output}"
-#
-# rule extract_content:
-#     input:
-#         selected_files="tmp_dir/selected_content",
-#         content_file="data/ftp.ensemblgenomes.org.tar.contents"
-#     output:
-#         "tmp_dir/selected_content_paths"
-#     shell:
-#         "cat {input.content_file} | grep -f {input.selected_files} > {output}"
 
 rule extract_genomes_from_archive:
     input:
@@ -40,9 +19,9 @@ rule extract_genomes_from_archive:
     #message: "Extract genomes from {input.archive} saving to {output.genomes}"
     shell:
         "mkdir -p {params.output_dir} ;"
-        "cut -f1 {input} > {params.output_dir}/{reference}_list ;"
-        "tar -tf {params.archive} | grep -f {params.output_dir}/{reference}_list > {params.output_dir}/{reference}_paths ;"
-        "tar -xvf {params.archive} -C {params.output_dir} -T {params.output_dir}/{reference}_paths --strip-components=8 && "
+        "cut -f1 {input} > {params.output_dir}/{wildcards.reference}_list ;"
+        "tar -tf {params.archive} | grep -f {params.output_dir}/{wildcards.reference}_list > {params.output_dir}/{wildcards.reference}_paths ;"
+        "tar -xvf {params.archive} -C {params.output_dir} -T {params.output_dir}/{wildcards.reference}_paths --strip-components=8 && "
         "tar -cvf {output} {params.output_dir}/*.gz"
 
 rule untar_genomes:
@@ -50,7 +29,7 @@ rule untar_genomes:
         "extracted_genomes/{reference}.tar"
         #"extracted_genomes/{reference}.tar"
     output:
-        dynamic("selected_genomes/{reference}/{id}.dna.toplevel.fa.gz")
+        dynamic("selected_genomes/{reference}/{n}.dna.toplevel.fa.gz")
     params:
         prefix="selected_genomes"
     shell:
@@ -60,9 +39,9 @@ rule untar_genomes:
 
 rule change_fasta:
     input:
-         dynamic("selected_genomes/{reference}/{id}.dna.toplevel.fa.gz")
+        "selected_genomes/{reference}/{n}.dna.toplevel.fa.gz"
     output:
-         "reference_genomes/{reference}/{id}.fasta.gz"
+        "reference_genomes/{reference}/{n}.fasta.gz"
     message:
         "Converting fasta"
     log:
@@ -96,7 +75,9 @@ rule change_fasta:
                 record.description = ""
                 sequences.append(record)
         #output_file = os.path.join(os.path.normpath(output[0]).split(os.sep)[0],"{}.fasta".format(genome))
+
         output_file = os.path.join(os.path.dirname(output[0]),"{}.fasta".format(genome))
+        print (output_file)
         with open(output_file,'w') as f_out:
             SeqIO.write(sequences, f_out, "fasta")
         f_out.close()
@@ -116,7 +97,7 @@ rule change_fasta:
 
 rule concatenate_fasta:
     input:
-        "reference_genomes/{reference}"
+        dynamic("reference_genomes/{reference}/{n}.fasta.gz")
     output:
         "references/{reference}.fasta.gz"
     params:
